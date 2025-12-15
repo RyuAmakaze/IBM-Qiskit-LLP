@@ -35,10 +35,10 @@ def load_trained_circuit(qpy_path: str):
 def run_inference():
     """Load the trained circuit and report test accuracy."""
 
-    x_train, x_test, y_train, y_test = load_pt_features(
+    _, x_test, _, y_test = load_pt_features(
         TRAIN_DATA_PATH, TEST_DATA_PATH, PCA_DIM
     )
-    num_class = len(np.unique(y_train))
+    num_class = len(np.unique(y_test))
 
     circuit = load_trained_circuit(WEIGHT_QPY_PATH)
 

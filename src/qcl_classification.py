@@ -108,6 +108,14 @@ class QclClassification:
         """Retrieve the parameters ``θ`` for ``U_out``."""
         return np.array(self.theta)
 
+    def get_trained_circuit(self):
+        """Return the output circuit with the current parameters bound."""
+
+        if self.output_gate is None:
+            raise RuntimeError("Output gate is not initialized.")
+
+        return self._bind_output_gate(self.theta)
+
     def _bind_output_gate(self, theta):
         if self.output_gate is None:
             raise RuntimeError("Output gate is not initialized.")
