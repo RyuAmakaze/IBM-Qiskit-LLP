@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import numpy as np
 from qiskit import qpy
-from qiskit_ibm_runtime import QiskitRuntimeService, Sampler, Session
+from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
+from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 
 from config import (
     C_DEPTH,
     IBM_API_KEY,
     IBM_BACKEND,
     IBM_CHANNEL,
+    IBM_INSTANCE_CRN,
     IBM_SHOTS,
     NQUBIT,
     PCA_DIM,
@@ -75,23 +77,46 @@ def run_hardware_inference(sample_count: int = 5):
     model = QclClassification(NQUBIT, C_DEPTH, num_class)
     model.set_output_gate(circuit)
 
-    service = QiskitRuntimeService(channel=IBM_CHANNEL, token=IBM_API_KEY)
+    service = QiskitRuntimeService(
+        channel=IBM_CHANNEL,
+        token=IBM_API_KEY,
+        instance=IBM_INSTANCE_CRN,
+    )
 
     predictions = []
-    with Session(service=service, backend=IBM_BACKEND) as session:
-        sampler = Sampler(session=session, options={"shots": IBM_SHOTS})
 
-        for idx in range(min(sample_count, len(x_test))):
-            qc = _build_sampling_circuit(model, x_test[idx])
-            job = sampler.run([qc])
-            quasi = job.result().quasi_dists[0]
-            probs = _quasi_to_probs(quasi, num_class)
-            pred_label = int(np.argmax(probs))
+    # IBM_BACKEND が名前(str)なら backend オブジェクトにする
+    backend = service.backend(IBM_BACKEND) if isinstance(IBM_BACKEND, str) else IBM_BACKEND
 
-            predictions.append(pred_label)
-            print(
-                f"sample {idx}: predicted={pred_label}, true={int(y_test[idx])}, distribution={probs}"
-            )
+    # ISA 回路に変換するための pass manager（2024-03-04 以降必須）
+    pm = generate_preset_pass_manager(backend=backend, optimization_level=1)
+
+    # Session は使わない（open plan だと session 作成が弾かれる）
+    sampler = SamplerV2(mode=backend)
+
+    for idx in range(min(sample_count, len(x_test))):
+        qc = _build_sampling_circuit(model, x_test[idx])
+
+        # ★ ISA に合わせて変換してから投げる
+        isa_qc = pm.run(qc)
+
+        job = sampler.run([isa_qc], shots=IBM_SHOTS)
+        res = job.result()
+
+        # SamplerV2 は quasi_dists ではなく counts 相当を返す
+        counts = res[0].data.meas.get_counts()  # 例: {"00": 510, "11": 490}
+
+        # 既存の _quasi_to_probs を活かすため、int-key の確率辞書に変換
+        shots = sum(counts.values()) if counts else 1
+        quasi = {int(bitstr, 2): c / shots for bitstr, c in counts.items()}
+
+        probs = _quasi_to_probs(quasi, num_class)
+        pred_label = int(np.argmax(probs))
+
+        predictions.append(pred_label)
+        print(
+            f"sample {idx}: predicted={pred_label}, true={int(y_test[idx])}, distribution={probs}"
+        )
 
     return predictions
 
