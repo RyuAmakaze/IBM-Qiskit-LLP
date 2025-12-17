@@ -65,9 +65,11 @@ WEIGHT_QPY_PATH = "model/depth=16_ite=100_circuit.qpy"
 # IBM Quantum runtime configuration
 # Set ``IBM_API_KEY`` to the API key associated with your IBM Quantum account.
 IBM_API_KEY = ""
+IBM_INSTANCE_CRN = ""
+
 # Runtime channel, typically ``ibm_quantum`` for real hardware or ``ibm_cloud`` for IBM Cloud.
-IBM_CHANNEL = "ibm_quantum"
+IBM_CHANNEL = "ibm_cloud"
 # Backend to use for hardware execution (e.g., ``ibm_oslo``); override as needed.
 IBM_BACKEND = "ibm_oslo"
 # Number of shots to collect when sampling circuits on hardware.
-IBM_SHOTS = 4000
+IBM_SHOTS = 100
