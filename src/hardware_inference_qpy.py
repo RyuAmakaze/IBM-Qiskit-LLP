@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import os
+
 import numpy as np
 from qiskit import qpy
 from qiskit_ibm_runtime import QiskitRuntimeService, SamplerV2
@@ -9,6 +12,7 @@ from qiskit.transpiler.preset_passmanagers import generate_preset_pass_manager
 
 from config import (
     C_DEPTH,
+    HARDWARE_RAW_RESULT_PATH,
     IBM_API_KEY,
     IBM_BACKEND,
     IBM_CHANNEL,
@@ -84,6 +88,7 @@ def run_hardware_inference(sample_count: int = 5):
     )
 
     predictions = []
+    raw_results = []
 
     # IBM_BACKEND が名前(str)なら backend オブジェクトにする
     backend = service.backend(IBM_BACKEND) if isinstance(IBM_BACKEND, str) else IBM_BACKEND
@@ -114,9 +119,25 @@ def run_hardware_inference(sample_count: int = 5):
         pred_label = int(np.argmax(probs))
 
         predictions.append(pred_label)
+        raw_results.append(
+            {
+                "sample_index": idx,
+                "counts": counts,
+                "shots": shots,
+                "quasi_distribution": quasi,
+                "probabilities": probs.tolist(),
+                "predicted_label": pred_label,
+                "true_label": int(y_test[idx]),
+            }
+        )
         print(
             f"sample {idx}: predicted={pred_label}, true={int(y_test[idx])}, distribution={probs}"
         )
+
+    os.makedirs(os.path.dirname(HARDWARE_RAW_RESULT_PATH) or ".", exist_ok=True)
+    with open(HARDWARE_RAW_RESULT_PATH, "w", encoding="utf-8") as f:
+        json.dump(raw_results, f, ensure_ascii=False, indent=2)
+    print(f"Raw hardware data saved to {HARDWARE_RAW_RESULT_PATH}")
 
     return predictions
 
