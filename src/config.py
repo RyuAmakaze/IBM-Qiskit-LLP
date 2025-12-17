@@ -62,6 +62,9 @@ WEIGHT_JSON_PATH = TRAINED_CIRCUIT_JSON
 # Path to the trained circuit serialized as a QPY file for inference
 WEIGHT_QPY_PATH = "model/depth=16_ite=100_circuit.qpy"
 
+# File path for storing raw hardware measurement results
+HARDWARE_RAW_RESULT_PATH = f"{MODEL_DIR}/hardware_counts.json"
+
 # IBM Quantum runtime configuration
 # Set ``IBM_API_KEY`` to the API key associated with your IBM Quantum account.
 IBM_API_KEY = ""
