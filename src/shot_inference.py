@@ -73,8 +73,8 @@ def _counts_to_probs(counts: Dict[str, int], num_class: int) -> np.ndarray:
     return np.array([quasi.get(cls, 0.0) for cls in range(num_class)])
 
 
-def run_shot_inference(sample_count: int = 5, shots: int = SIMULATOR_SHOTS) -> List[int]:
-    """Execute the trained circuit on AerSimulator and store raw counts."""
+def run_shot_inference(shots: int = SIMULATOR_SHOTS) -> List[int]:
+    """Execute the trained circuit on AerSimulator for every test sample."""
 
     _, x_test, _, y_test = load_pt_features(TRAIN_DATA_PATH, TEST_DATA_PATH, PCA_DIM)
     num_class = len(np.unique(y_test))
@@ -88,8 +88,8 @@ def run_shot_inference(sample_count: int = 5, shots: int = SIMULATOR_SHOTS) -> L
     predictions: List[int] = []
     raw_results = []
 
-    for idx in range(min(sample_count, len(x_test))):
-        qc = _build_sampling_circuit(model, x_test[idx])
+    for idx, x_sample in enumerate(x_test):
+        qc = _build_sampling_circuit(model, x_sample)
         compiled = transpile(qc, simulator)
         job = simulator.run(compiled, shots=shots)
         res = job.result()
@@ -124,12 +124,6 @@ def run_shot_inference(sample_count: int = 5, shots: int = SIMULATOR_SHOTS) -> L
 def _build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run shot-based inference on AerSimulator.")
     parser.add_argument(
-        "--samples",
-        type=int,
-        default=5,
-        help="Number of test samples to evaluate with shot-based inference.",
-    )
-    parser.add_argument(
         "--shots",
         type=int,
         default=SIMULATOR_SHOTS,
@@ -144,9 +138,9 @@ def main():
 
     print(f"Loading trained circuit from {WEIGHT_QPY_PATH}")
     print(
-        f"Starting shot-based simulator inference with {args.shots} shots per circuit (samples={args.samples})."
+        f"Starting shot-based simulator inference with {args.shots} shots per circuit for all test samples."
     )
-    run_shot_inference(sample_count=args.samples, shots=args.shots)
+    run_shot_inference(shots=args.shots)
 
 
 if __name__ == "__main__":
