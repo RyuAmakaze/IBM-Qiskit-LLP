@@ -46,10 +46,9 @@ def load_trained_circuit(qpy_path: str):
 
 
 def _build_sampling_circuit(model: QclClassification, x_sample: np.ndarray):
-    """Encode a single sample and attach measurements for hardware execution."""
+    """Encode a pre-scaled sample and attach measurements for hardware execution."""
 
-    x_scaled = min_max_scaling(np.asarray([x_sample]))[0]
-    input_gate = model.create_input_gate(x_scaled)
+    input_gate = model.create_input_gate(x_sample)
 
     circuit = input_gate.compose(model.output_gate)
     circuit.measure_all()
@@ -90,6 +89,7 @@ def run_hardware_inference(sample_count: int = 5):
         raise ValueError("Set IBM_API_KEY in config.py before running hardware inference.")
 
     _, x_test, _, y_test = load_pt_features(TRAIN_DATA_PATH, TEST_DATA_PATH, PCA_DIM)
+    x_scaled = min_max_scaling(x_test)
     num_class = len(np.unique(y_test))
 
     circuit = load_trained_circuit(WEIGHT_QPY_PATH)
@@ -115,7 +115,7 @@ def run_hardware_inference(sample_count: int = 5):
     sampler = SamplerV2(mode=backend)
 
     for idx in range(min(sample_count, len(x_test))):
-        qc = _build_sampling_circuit(model, x_test[idx])
+        qc = _build_sampling_circuit(model, x_scaled[idx])
 
         # ★ ISA に合わせて変換してから投げる
         isa_qc = pm.run(qc)

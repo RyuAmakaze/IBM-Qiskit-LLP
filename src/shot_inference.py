@@ -50,10 +50,9 @@ def load_trained_circuit(qpy_path: str):
 
 
 def _build_sampling_circuit(model: QclClassification, x_sample: np.ndarray):
-    """Encode a single sample and attach measurements for simulator execution."""
+    """Encode a pre-scaled sample and attach measurements for simulator execution."""
 
-    x_scaled = min_max_scaling(np.asarray([x_sample]))[0]
-    input_gate = model.create_input_gate(x_scaled)
+    input_gate = model.create_input_gate(x_sample)
 
     circuit = input_gate.compose(model.output_gate)
     circuit.measure_all()
@@ -85,6 +84,7 @@ def run_shot_inference(shots: int = SIMULATOR_SHOTS) -> List[int]:
     """Execute the trained circuit on AerSimulator for every test sample."""
 
     _, x_test, _, y_test = load_pt_features(TRAIN_DATA_PATH, TEST_DATA_PATH, PCA_DIM)
+    x_scaled = min_max_scaling(x_test)
     num_class = len(np.unique(y_test))
 
     circuit = load_trained_circuit(WEIGHT_QPY_PATH)
@@ -96,7 +96,7 @@ def run_shot_inference(shots: int = SIMULATOR_SHOTS) -> List[int]:
     predictions: List[int] = []
     raw_results = []
 
-    for idx, x_sample in enumerate(x_test):
+    for idx, x_sample in enumerate(x_scaled):
         qc = _build_sampling_circuit(model, x_sample)
         compiled = transpile(qc, simulator)
         job = simulator.run(compiled, shots=shots)
