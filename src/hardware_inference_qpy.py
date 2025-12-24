@@ -46,10 +46,9 @@ def load_trained_circuit(qpy_path: str):
 
 
 def _build_sampling_circuit(model: QclClassification, x_sample: np.ndarray):
-    """Encode a single sample and attach measurements for hardware execution."""
+    """Encode a pre-scaled sample and attach measurements for hardware execution."""
 
-    x_scaled = min_max_scaling(np.asarray([x_sample]))[0]
-    input_gate = model.create_input_gate(x_scaled)
+    input_gate = model.create_input_gate(x_sample)
 
     circuit = input_gate.compose(model.output_gate)
     circuit.measure_all()
@@ -57,9 +56,24 @@ def _build_sampling_circuit(model: QclClassification, x_sample: np.ndarray):
 
 
 def _quasi_to_probs(quasi_dist, num_class: int):
-    """Convert a quasi-distribution into class probabilities."""
+    """Convert a quasi-distribution into class probabilities.
 
-    return np.array([quasi_dist.get(cls, 0.0) for cls in range(num_class)])
+    The sampler can return outcomes whose integer value exceeds the number of
+    classes. We fold those values with ``value % num_class`` so that all shot
+    mass contributes to some class probability instead of yielding all-zero
+    vectors.
+    """
+
+    class_counts = np.zeros(num_class, dtype=float)
+    for bit_val, prob in quasi_dist.items():
+        cls = bit_val % num_class
+        class_counts[cls] += prob
+
+    total = class_counts.sum()
+    if total == 0:
+        return np.full(num_class, 1.0 / num_class)
+
+    return class_counts / total
 
 
 def run_hardware_inference(sample_count: int = 5):
@@ -75,6 +89,7 @@ def run_hardware_inference(sample_count: int = 5):
         raise ValueError("Set IBM_API_KEY in config.py before running hardware inference.")
 
     _, x_test, _, y_test = load_pt_features(TRAIN_DATA_PATH, TEST_DATA_PATH, PCA_DIM)
+    x_scaled = min_max_scaling(x_test)
     num_class = len(np.unique(y_test))
 
     circuit = load_trained_circuit(WEIGHT_QPY_PATH)
@@ -100,7 +115,7 @@ def run_hardware_inference(sample_count: int = 5):
     sampler = SamplerV2(mode=backend)
 
     for idx in range(min(sample_count, len(x_test))):
-        qc = _build_sampling_circuit(model, x_test[idx])
+        qc = _build_sampling_circuit(model, x_scaled[idx])
 
         # ★ ISA に合わせて変換してから投げる
         isa_qc = pm.run(qc)
@@ -139,7 +154,10 @@ def run_hardware_inference(sample_count: int = 5):
         json.dump(raw_results, f, ensure_ascii=False, indent=2)
     print(f"Raw hardware data saved to {HARDWARE_RAW_RESULT_PATH}")
 
-    return predictions
+    accuracy = float(np.mean(np.array(predictions) == y_test[: len(predictions)]))
+    print(f"Hardware sampling accuracy: {accuracy:.3f} ({len(predictions)} samples)")
+
+    return predictions, accuracy
 
 
 if __name__ == "__main__":
