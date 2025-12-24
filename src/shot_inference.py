@@ -12,7 +12,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from typing import Dict, List
+from typing import Dict, List, Tuple
 
 import numpy as np
 from qiskit import qpy, transpile
@@ -80,8 +80,14 @@ def _counts_to_probs(counts: Dict[str, int], num_class: int) -> np.ndarray:
     return class_counts / shots
 
 
-def run_shot_inference(shots: int = SIMULATOR_SHOTS) -> List[int]:
-    """Execute the trained circuit on AerSimulator for every test sample."""
+def run_shot_inference(shots: int = SIMULATOR_SHOTS) -> Tuple[List[int], float]:
+    """Execute the trained circuit on AerSimulator for every test sample.
+
+    Returns
+    -------
+    Tuple[List[int], float]
+        Predicted labels for each test sample and the overall accuracy.
+    """
 
     _, x_test, _, y_test = load_pt_features(TRAIN_DATA_PATH, TEST_DATA_PATH, PCA_DIM)
     x_scaled = min_max_scaling(x_test)
@@ -126,7 +132,10 @@ def run_shot_inference(shots: int = SIMULATOR_SHOTS) -> List[int]:
         json.dump(raw_results, f, ensure_ascii=False, indent=2)
     print(f"Raw simulator data saved to {SIMULATOR_RAW_RESULT_PATH} (shots={shots}).")
 
-    return predictions
+    accuracy = float(np.mean(np.array(predictions) == y_test))
+    print(f"Simulator sampling accuracy: {accuracy:.3f} ({len(predictions)} samples)")
+
+    return predictions, accuracy
 
 
 def _build_arg_parser() -> argparse.ArgumentParser:

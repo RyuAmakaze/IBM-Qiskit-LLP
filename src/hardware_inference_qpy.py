@@ -154,7 +154,10 @@ def run_hardware_inference(sample_count: int = 5):
         json.dump(raw_results, f, ensure_ascii=False, indent=2)
     print(f"Raw hardware data saved to {HARDWARE_RAW_RESULT_PATH}")
 
-    return predictions
+    accuracy = float(np.mean(np.array(predictions) == y_test[: len(predictions)]))
+    print(f"Hardware sampling accuracy: {accuracy:.3f} ({len(predictions)} samples)")
+
+    return predictions, accuracy
 
 
 if __name__ == "__main__":
