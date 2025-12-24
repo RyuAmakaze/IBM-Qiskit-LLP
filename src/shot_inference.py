@@ -63,14 +63,22 @@ def _build_sampling_circuit(model: QclClassification, x_sample: np.ndarray):
 def _counts_to_probs(counts: Dict[str, int], num_class: int) -> np.ndarray:
     """Convert sampled bitstring counts into class probabilities.
 
-    Each computational-basis bitstring is treated as the integer label for the
-    corresponding class. The probability for class ``k`` is the fraction of
-    shots whose bitstring decodes to ``k``.
+    Bitstrings are decoded to integers and folded into the label range via
+    ``value % num_class``. This prevents losing probability mass when the
+    measured state index exceeds the number of target classes, which otherwise
+    produced zero vectors and a constant prediction of class ``0``.
     """
 
-    shots = sum(counts.values()) if counts else 1
-    quasi = {int(bitstr, 2): c / shots for bitstr, c in counts.items()}
-    return np.array([quasi.get(cls, 0.0) for cls in range(num_class)])
+    class_counts = np.zeros(num_class, dtype=float)
+    for bitstr, count in counts.items():
+        cls = int(bitstr, 2) % num_class
+        class_counts[cls] += count
+
+    shots = class_counts.sum()
+    if shots == 0:
+        return np.full(num_class, 1.0 / num_class)
+
+    return class_counts / shots
 
 
 def run_shot_inference(shots: int = SIMULATOR_SHOTS) -> List[int]:
