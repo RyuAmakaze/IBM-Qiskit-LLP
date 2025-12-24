@@ -57,9 +57,24 @@ def _build_sampling_circuit(model: QclClassification, x_sample: np.ndarray):
 
 
 def _quasi_to_probs(quasi_dist, num_class: int):
-    """Convert a quasi-distribution into class probabilities."""
+    """Convert a quasi-distribution into class probabilities.
 
-    return np.array([quasi_dist.get(cls, 0.0) for cls in range(num_class)])
+    The sampler can return outcomes whose integer value exceeds the number of
+    classes. We fold those values with ``value % num_class`` so that all shot
+    mass contributes to some class probability instead of yielding all-zero
+    vectors.
+    """
+
+    class_counts = np.zeros(num_class, dtype=float)
+    for bit_val, prob in quasi_dist.items():
+        cls = bit_val % num_class
+        class_counts[cls] += prob
+
+    total = class_counts.sum()
+    if total == 0:
+        return np.full(num_class, 1.0 / num_class)
+
+    return class_counts / total
 
 
 def run_hardware_inference(sample_count: int = 5):
